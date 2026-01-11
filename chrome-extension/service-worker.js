@@ -1,7 +1,9 @@
 const POLL_ALARM = "poll-blocked-tasks";
-const MIN_CAPTURE_INTERVAL_MS = 1100;
+const MIN_CAPTURE_INTERVAL_MS = 1200;
 let lastCaptureTime = 0;
+let captureQueue = Promise.resolve();
 const PROXY_BASE_URL = "http://localhost:8787";
+const BACKEND_BASE_URL = "http://localhost:8080";
 const HISTORY_DAYS = 7;
 const MAX_HISTORY_ITEMS = 2000;
 const MAX_HOSTS = 25;
@@ -106,8 +108,29 @@ async function pollBlockedTasks() {
 }
 
 async function submitWorkflowSteps(payload) {
-  // Stubbed backend call for verified steps.
-  return { ok: true, stepsId: crypto.randomUUID(), received: payload || null };
+  if (!payload) {
+    return { ok: false, error: "Missing workflow payload" };
+  }
+
+  const idempotencyKey = crypto.randomUUID();
+  const response = await fetch(`${BACKEND_BASE_URL}/workflows`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "Idempotency-Key": idempotencyKey
+    },
+    body: JSON.stringify(payload)
+  });
+
+  const json = await response.json().catch(() => ({}));
+  if (!response.ok) {
+    return {
+      ok: false,
+      error: json?.detail || json?.error || `Backend error (${response.status})`
+    };
+  }
+
+  return { ok: true, workflow: json };
 }
 
 async function discoverHosts() {
@@ -218,11 +241,12 @@ async function captureViewport() {
     return { ok: false };
   }
 
-  await ensureCaptureBudget();
-  const dataUrl = await chrome.tabs.captureVisibleTab(activeTab.windowId, {
-    format: "jpeg",
-    quality: 80
-  });
+  const dataUrl = await enqueueCapture(() =>
+    chrome.tabs.captureVisibleTab(activeTab.windowId, {
+      format: "jpeg",
+      quality: 80
+    })
+  );
 
   return { ok: true, contentType: "image/jpeg", dataUrl };
 }
@@ -234,6 +258,17 @@ async function ensureCaptureBudget() {
     await new Promise((resolve) => setTimeout(resolve, waitMs));
   }
   lastCaptureTime = Date.now();
+}
+
+function enqueueCapture(task) {
+  const run = async () => {
+    await ensureCaptureBudget();
+    return task();
+  };
+
+  const next = captureQueue.then(run, run);
+  captureQueue = next.catch(() => {});
+  return next;
 }
 
 async function analyzeWorkflowSites(taskDescription) {
