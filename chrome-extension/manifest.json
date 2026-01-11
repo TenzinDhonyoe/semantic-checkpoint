@@ -17,7 +17,7 @@
     "scripting",
     "alarms"
   ],
-  "host_permissions": ["<all_urls>", "http://localhost:8787/*"],
+  "host_permissions": ["<all_urls>", "http://localhost:8787/*", "http://localhost:8080/*"],
   "background": {
     "service_worker": "service-worker.js"
   },
