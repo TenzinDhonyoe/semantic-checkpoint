@@ -1,0 +1,29 @@
+# WebAgent API Service Dependencies
+
+# Web Framework
+fastapi>=0.109.0
+uvicorn[standard]>=0.27.0
+
+# Async HTTP Client (for callback POSTs)
+httpx>=0.26.0
+
+# Data validation (comes with FastAPI but explicit)
+pydantic>=2.5.0
+
+# Image processing
+Pillow>=10.0.0
+
+# Numerical processing
+numpy>=1.24.0
+
+# MongoDB
+pymongo[srv]>=4.6.0
+python-dotenv>=1.0.0
+
+# BrowserGym dependencies (should already be installed in venv)
+# gymnasium
+# playwright
+# anthropic
+
+# Note: agentlab and browsergym packages should be installed separately
+# as they may have custom installation requirements
